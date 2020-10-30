@@ -1,0 +1,7 @@
+{
+  "name": "PhotosSave",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
