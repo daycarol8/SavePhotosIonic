@@ -9,8 +9,6 @@ import { Component, OnInit } from '@angular/core';
 })
 export class Tab2Page implements OnInit{
 
-  photos = this.photoService.photos;
-
   constructor(public photoService: PhotoService) {}
 
   async ngOnInit() {
