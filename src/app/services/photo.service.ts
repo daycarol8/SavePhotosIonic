@@ -1,9 +1,12 @@
+import { AuthService } from './auth.service';
 import { Platform } from '@ionic/angular';
 import { Photo } from './../models/photo';
 import { Injectable } from '@angular/core';
 import { Plugins, CameraResultType, Capacitor, FilesystemDirectory, CameraPhoto, CameraSource } from '@capacitor/core';
 import { promise } from 'protractor';
-
+import { pipe } from 'rxjs';
+import { take } from 'rxjs/operators';
+import { AngularFireStorage } from '@angular/fire/storage'
 const {Camera, FileSystem, Storage} = Plugins;
 
 @Injectable({
@@ -11,11 +14,12 @@ const {Camera, FileSystem, Storage} = Plugins;
 })
 export class PhotoService {
 
+
   public photos: Photo[] = [];
   private PHOTO_STORAGE = 'photos';
   private platform: Platform;
 
-  constructor(platform: Platform) {
+  constructor(platform: Platform, public authservice: AuthService, public fireStorage: AngularFireStorage) {
     this.platform = platform;
    }
 
@@ -51,9 +55,10 @@ export class PhotoService {
   }
 
   private async savePicture(cameraPhoto: CameraPhoto){
-    const base64Data = await this.readAsBase64(cameraPhoto);
-
     const fileName = new Date().getTime() + '.jpg';
+    const base64Data = await this.readAsBase64(cameraPhoto,fileName);
+
+    
     const savedFile = await FileSystem.writeFile({
       path: fileName,
       data: base64Data,
@@ -74,18 +79,43 @@ export class PhotoService {
     }
   }
 
-   private async readAsBase64(cameraPhoto: CameraPhoto) {
+   private async readAsBase64(cameraPhoto: CameraPhoto, filename: string) {
     if (this.platform.is('hybrid')){
       const file = await FileSystem.readFile({
         path: cameraPhoto.path
       });
+      this.uploadPicture(file.data, filename);
       return file.data;
     }
     else{
       const response = await fetch(cameraPhoto.webPath);
       const blob = await response.blob();
+      this.uploadPicture(blob, filename);
       return await this.convertBlobToBase64(blob) as string;
     }
+  }
+
+  public async delePicture(photo: Photo, position: number) {
+    this.photos.splice(position, 1);
+    Storage.set({
+      key: this.PHOTO_STORAGE,
+      value: JSON.stringify(this.photos)
+    });
+    const filename = photo.filepath.substr(photo.filepath.lastIndexOf('/') + 1);
+    await FileSystem.deleteFile({
+      path: filename,
+      directory: FilesystemDirectory.Data
+    })
+  }
+
+  private uploadPicture(file: any, filename: string){
+    this.authservice.getUser(),
+    pipe(
+      take(1)
+    ).subscribe((user) => {
+      const ref = this.fireStorage.ref(user.uid + '/' + filename);
+      const task = ref.put(file);
+    });
   }
 
   convertBlobToBase64 = (blob: Blob) => new Promise((resolve, reject) => {
